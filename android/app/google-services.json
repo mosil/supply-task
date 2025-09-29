@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "457170088441",
+    "project_id": "supply-tasks",
+    "storage_bucket": "supply-tasks.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457170088441:android:ae37b9b849333b36694d28",
+        "android_client_info": {
+          "package_name": "space.mosil.task.supply.supply_task"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqNTtwcl1FtLTIB_iUcgV6oLiNSjA1hyA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

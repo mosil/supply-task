@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../models/task.dart';
-import '../models/user_profile.dart';
+import '../models/task_type.dart';
 import '../providers/auth_provider.dart';
 import '../providers/task_provider.dart';
+import '../providers/task_type_provider.dart';
 import '../widgets/shared/confirmation_dialog.dart';
 
 class CreateEditTaskPage extends StatefulWidget {
   final String? taskId;
+
   const CreateEditTaskPage({super.key, this.taskId});
 
   bool get isEditing => taskId != null;
@@ -19,60 +22,83 @@ class CreateEditTaskPage extends StatefulWidget {
 
 class _CreateEditTaskPageState extends State<CreateEditTaskPage> {
   final _formKey = GlobalKey<FormState>();
-  String? _selectedTaskType;
+  Task? _initialTask;
+  String? _selectedTaskTypeId;
   bool _isCustomType = false;
   bool _isDirty = false;
 
   final _nameController = TextEditingController();
   final _contentController = TextEditingController();
   final _addressController = TextEditingController();
-  final _contactNameController = TextEditingController();
   final _contactInfoController = TextEditingController();
   final _contactPhoneController = TextEditingController();
   final _customTypeController = TextEditingController();
+  final _customTypeFocusNode = FocusNode();
+
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Add listeners to all controllers to track changes
-    void setDirty(_) => setState(() => _isDirty = true);
-    _nameController.addListener(() => setDirty(null));
-    _contentController.addListener(() => setDirty(null));
-    _addressController.addListener(() => setDirty(null));
-    _contactNameController.addListener(() => setDirty(null));
-    _contactInfoController.addListener(() => setDirty(null));
-    _contactPhoneController.addListener(() => setDirty(null));
-    _customTypeController.addListener(() => setDirty(null));
 
-    if (widget.isEditing) {
-      // Edit mode: Pre-fill form with task data
-      final task = context.read<TaskProvider>().getTaskById(widget.taskId!);
-      if (task != null) {
-        _nameController.text = task.name;
-        _contentController.text = task.content;
-        _addressController.text = task.address;
-        _contactNameController.text = task.publisherName;
+    void setDirty() => setState(() => _isDirty = true);
+    _nameController.addListener(setDirty);
+    _contentController.addListener(setDirty);
+    _addressController.addListener(setDirty);
+    _contactInfoController.addListener(setDirty);
+    _contactPhoneController.addListener(setDirty);
+    _customTypeController.addListener(setDirty);
 
-        const defaultTypes = ['勞力任務', '補給品需求', '發放資源'];
-        if (defaultTypes.contains(task.type)) {
-          _selectedTaskType = task.type;
-        } else {
-          _selectedTaskType = '其他';
-          _isCustomType = true;
-          _customTypeController.text = task.type;
+    // Use a post-frame callback to access providers safely in initState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final taskTypeProvider = context.read<TaskTypeProvider>();
+
+      if (widget.isEditing) {
+        setState(() => _isLoading = true);
+        final task = context.read<TaskProvider>().getTaskById(widget.taskId!);
+        if (task != null) {
+          _initialTask = task;
+          _nameController.text = task.name;
+          _contentController.text = task.content;
+          _addressController.text = task.address;
+          _contactInfoController.text = task.contactInfo;
+          _contactPhoneController.text = task.contactPhone;
+          _selectedTaskTypeId = task.typeId;
         }
-        // Reset dirty flag after initial setup
-        WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _isDirty = false));
+        setState(() => _isLoading = false);
+      } else {
+        final user = context.read<AuthProvider>().user;
+        if (user != null) {
+          _contactInfoController.text = user.contactInfo;
+          _contactPhoneController.text = user.phoneNumber;
+        }
       }
-    } else {
-      // Create mode: Auto-fill with user's profile data
-      final UserProfile? user = context.read<AuthProvider>().user;
-      if (user != null) {
-        _contactNameController.text = user.displayName;
-        _contactInfoController.text = user.contactInfo;
-        _contactPhoneController.text = user.phoneNumber;
+
+      // Reset dirty flag after initial setup
+      setState(() => _isDirty = false);
+    });
+  }
+
+  Future<void> _onWillPop() async {
+    if (!_isDirty) {
+      if (mounted) {
+        context.go(widget.isEditing ? '/task/${widget.taskId}' : '/');
       }
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _isDirty = false));
+      return;
+    }
+
+    final bool shouldPop = await showConfirmationDialog(
+          context: context,
+          title: '確認捨棄變更',
+          content: const Text('您確定要離開嗎？所有未儲存的變更將會遺失。'),
+          confirmButtonText: '確定捨棄',
+          onConfirm: () {},
+        ) ??
+        false;
+
+    if (shouldPop && mounted) {
+      context.go(widget.isEditing ? '/task/${widget.taskId}' : '/');
     }
   }
 
@@ -81,256 +107,268 @@ class _CreateEditTaskPageState extends State<CreateEditTaskPage> {
     _nameController.dispose();
     _contentController.dispose();
     _addressController.dispose();
-    _contactNameController.dispose();
     _contactInfoController.dispose();
     _contactPhoneController.dispose();
     _customTypeController.dispose();
+    _customTypeFocusNode.dispose();
     super.dispose();
   }
 
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      final taskType = _isCustomType ? _customTypeController.text : _selectedTaskType!;
+  Future<void> _saveTask({required bool isDraft}) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    final taskProvider = context.read<TaskProvider>();
+    final authProvider = context.read<AuthProvider>();
+    final taskTypeProvider = context.read<TaskTypeProvider>();
+    final currentUser = authProvider.user!;
+
+    try {
+      String finalTypeId;
+      if (_isCustomType) {
+        finalTypeId = await taskTypeProvider.getOrCreateTaskTypeId(_customTypeController.text);
+      } else {
+        finalTypeId = _selectedTaskTypeId!;
+      }
+
+      final TaskStatus newStatus = isDraft ? TaskStatus.draft : TaskStatus.published;
+
       if (widget.isEditing) {
-        final originalTask = context.read<TaskProvider>().getTaskById(widget.taskId!)!;
+        final originalTask = _initialTask!;
         final updatedTask = Task(
           id: originalTask.id,
           name: _nameController.text,
           content: _contentController.text,
           address: _addressController.text,
-          type: taskType,
-          status: originalTask.status,
-          publisherName: _contactNameController.text,
+          typeId: finalTypeId,
+          status: newStatus,
+          publisherId: originalTask.publisherId,
+          contactInfo: _contactInfoController.text,
+          contactPhone: _contactPhoneController.text,
           publishedAt: originalTask.publishedAt,
           editedAt: DateTime.now(),
-          claimantName: originalTask.claimantName,
+          claimantId: originalTask.claimantId,
           claimedAt: originalTask.claimedAt,
           completedAt: originalTask.completedAt,
-          statusChangedAt: originalTask.statusChangedAt,
+          statusChangedAt: originalTask.status != newStatus ? DateTime.now() : originalTask.statusChangedAt,
         );
-        context.read<TaskProvider>().updateTask(updatedTask);
-        setState(() => _isDirty = false);
-        context.go('/task/${updatedTask.id}');
+        await taskProvider.updateTask(updatedTask);
+        if (mounted) context.go('/task/${updatedTask.id}');
       } else {
         final newTask = Task(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          id: '', // Firestore will generate
           name: _nameController.text,
           content: _contentController.text,
           address: _addressController.text,
-          type: taskType,
-          status: TaskStatus.published,
-          publisherName: _contactNameController.text,
+          typeId: finalTypeId,
+          status: newStatus,
+          publisherId: currentUser.uid,
+          contactInfo: _contactInfoController.text,
+          contactPhone: _contactPhoneController.text,
           publishedAt: DateTime.now(),
+          claimantId: null,
         );
-        context.read<TaskProvider>().addTask(newTask);
-        setState(() => _isDirty = false);
-        context.go('/task/${newTask.id}');
+        final docRef = await taskProvider.addTask(newTask);
+        if (mounted) context.go('/task/${docRef.id}');
+      }
+    } catch (e) {
+      debugPrint('Error saving task: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('儲存任務失敗: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<bool> _onWillPop() async {
-    if (!_isDirty) return true; // Allow pop if no changes
-
-    final shouldPop = await showConfirmationDialog(
+  void _deleteTask() {
+    showConfirmationDialog(
       context: context,
-      title: '確認捨棄變更',
-      content: const Text('您確定要離開嗎？所有未儲存的變更將會遺失。'),
-      confirmButtonText: '確定捨棄',
-      onConfirm: () {}, // onConfirm is handled by the dialog's return value
+      title: '確認刪除任務',
+      content: const Text('您確定要刪除這個任務嗎？此操作無法復原。'),
+      confirmButtonText: '確定刪除',
+      onConfirm: () async {
+        await context.read<TaskProvider>().deleteTask(widget.taskId!);
+        if (mounted) context.go('/');
+      },
     );
-
-    return shouldPop ?? false;
   }
 
   @override
   Widget build(BuildContext context) {
+    final taskTypeProvider = context.watch<TaskTypeProvider>();
+
     return PopScope(
-      canPop: !_isDirty,
-      onPopInvoked: (didPop) async {
+      canPop: false, // Always intercept pop attempts
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        final shouldPop = await _onWillPop();
-        if (shouldPop && mounted) {
-          context.go('/');
-        }
+        _onWillPop();
       },
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.isEditing ? '編輯任務' : '發布任務'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              if (await _onWillPop()) {
-                if (widget.isEditing) {
-                  context.go('/task/${widget.taskId}');
-                } else {
-                  context.go('/');
-                }
-              }
-            },
-          ),
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onWillPop),
           actions: [
             if (widget.isEditing)
               IconButton(
                 icon: const Icon(Icons.delete),
                 tooltip: '刪除任務',
-                onPressed: () {
-                  showConfirmationDialog(
-                    context: context,
-                    title: '確認刪除任務',
-                    content: const Text('您確定要刪除這個任務嗎？此操作無法復原。'),
-                    confirmButtonText: '確定刪除',
-                    onConfirm: () {
-                      // TODO: Implement delete logic
-                      context.go('/');
-                    },
-                  );
-                },
+                onPressed: _deleteTask,
               ),
           ],
         ),
-        body: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(16.0),
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '任務名稱',
-                  hintText: '請輸入任務名稱',
-                  border: OutlineInputBorder(),
-                ),
-                maxLength: 30,
-                validator: (value) => (value?.isEmpty ?? true) ? '任務名稱為必填' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contentController,
-                decoration: const InputDecoration(
-                  labelText: '任務內容',
-                  hintText: '請輸入本次任務的需求',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 5,
-                maxLength: 500,
-                validator: (value) => (value?.isEmpty ?? true) ? '任務內容為必填' : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _addressController,
-                decoration: const InputDecoration(
-                  labelText: '地點',
-                  hintText: '請輸入本次任務的地點',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: '任務性質',
-                  border: OutlineInputBorder(),
-                ),
-                value: _selectedTaskType,
-                items: ['勞力任務', '補給品需求', '發放資源', '其他']
-                    .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedTaskType = value;
-                    _isCustomType = value == '其他';
-                    _isDirty = true;
-                  });
-                },
-                validator: (value) => (value == null) ? '請選擇任務性質' : null,
-              ),
-              if (_isCustomType)
-                Padding(
-                  padding: const EdgeInsets.only(top: 16.0),
-                  child: TextFormField(
-                    controller: _customTypeController,
-                    decoration: const InputDecoration(
-                      labelText: '自訂任務性質',
-                      hintText: '請輸入新的任務性質',
-                      border: OutlineInputBorder(),
+        body: _isLoading || taskTypeProvider.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16.0),
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(labelText: '任務名稱', hintText: '請輸入任務名稱', border: OutlineInputBorder()),
+                      maxLength: 30,
+                      validator: (value) => (value?.isEmpty ?? true) ? '任務名稱為必填' : null,
                     ),
-                    maxLength: 10,
-                    validator: (value) =>
-                        (_isCustomType && (value?.isEmpty ?? true)) ? '此欄位為必填' : null,
-                  ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contentController,
+                      decoration: const InputDecoration(
+                        labelText: '任務內容',
+                        hintText: '請輸入本次任務的需求',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 5,
+                      maxLength: 500,
+                      validator: (value) => (value?.isEmpty ?? true) ? '任務內容為必填' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: const InputDecoration(
+                        labelText: '地點',
+                        hintText: '請輸入本次任務的地點',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      decoration: const InputDecoration(labelText: '任務性質', border: OutlineInputBorder()),
+                      value: _selectedTaskTypeId,
+                      hint: const Text('請選擇'),
+                      items: [
+                        ...taskTypeProvider.taskTypes.map((TaskType type) {
+                          return DropdownMenuItem<String>(
+                            value: type.id,
+                            child: Text(type.name),
+                          );
+                        }),
+                        const DropdownMenuItem<String>(
+                          value: 'other',
+                          child: Text('其他...'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _isDirty = true;
+                          if (value == 'other') {
+                            _isCustomType = true;
+                            _selectedTaskTypeId = null;
+                            _customTypeFocusNode.requestFocus();
+                          } else {
+                            _isCustomType = false;
+                            _selectedTaskTypeId = value;
+                          }
+                        });
+                      },
+                      validator: (value) {
+                        if (!_isCustomType && value == null) {
+                          return '請選擇任務性質';
+                        }
+                        return null;
+                      },
+                    ),
+                    if (_isCustomType)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0),
+                        child: TextFormField(
+                          controller: _customTypeController,
+                          focusNode: _customTypeFocusNode,
+                          decoration: const InputDecoration(
+                            labelText: '自訂任務性質',
+                            hintText: '請輸入新的任務性質',
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLength: 10,
+                          validator: (value) => (_isCustomType && (value?.isEmpty ?? true)) ? '此欄位為必填' : null,
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    Text('聯絡資訊', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contactInfoController,
+                      decoration: const InputDecoration(
+                        labelText: '聯絡資訊',
+                        hintText: '請輸入聯絡電話外的資訊',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _contactPhoneController,
+                      decoration: const InputDecoration(labelText: '聯絡電話', hintText: '請輸入聯絡電話'),
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9-]+'))],
+                    ),
+                  ],
                 ),
-              const SizedBox(height: 24),
-              Text('聯絡資訊', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contactNameController,
-                decoration: const InputDecoration(
-                  labelText: '聯絡人',
-                  hintText: '請輸入本次任務的聯絡人',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => (value?.isEmpty ?? true) ? '聯絡人為必填' : null,
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contactInfoController,
-                decoration: const InputDecoration(
-                  labelText: '聯絡資訊',
-                  hintText: '請輸入聯絡電話外的資訊',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _contactPhoneController,
-                decoration: const InputDecoration(
-                  labelText: '聯絡電話',
-                  hintText: '請輸入聯絡電話',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        bottomNavigationBar: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  child: const Text('儲存草稿'),
-                  onPressed: () {
-                    // TODO: Implement save draft
-                  },
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  child: Text(widget.isEditing ? '更新' : '發布'),
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      showConfirmationDialog(
-                        context: context,
-                        title: widget.isEditing ? '確認更新' : '確認發布',
-                        content: Text('您確定要${widget.isEditing ? '更新' : '發布'}這個任務嗎？'),
-                        confirmButtonText: widget.isEditing ? '確定更新' : '確定發布',
-                        onConfirm: _submitForm,
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        bottomNavigationBar: Padding(padding: const EdgeInsets.all(16.0), child: _buildBottomButtons()),
       ),
     );
+  }
+
+  Widget _buildBottomButtons() {
+    if (widget.isEditing) {
+      // We are in edit mode
+      if (_initialTask?.status == TaskStatus.draft) {
+        // Editing a draft
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: OutlinedButton(child: const Text('更新草稿'), onPressed: () => _saveTask(isDraft: true)),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton(child: const Text('發布'), onPressed: () => _saveTask(isDraft: false)),
+            ),
+          ],
+        );
+      } else {
+        // Editing a published/other status task
+        return ElevatedButton(child: const Text('更新任務'), onPressed: () => _saveTask(isDraft: false));
+      }
+    } else {
+      // We are creating a new task
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Expanded(
+            child: OutlinedButton(child: const Text('儲存草稿'), onPressed: () => _saveTask(isDraft: true)),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: ElevatedButton(child: const Text('發布'), onPressed: () => _saveTask(isDraft: false)),
+          ),
+        ],
+      );
+    }
   }
 }

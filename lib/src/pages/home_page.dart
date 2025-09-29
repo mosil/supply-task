@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/project_provider.dart';
 import '../providers/task_provider.dart';
 import '../widgets/task_list.dart';
 
@@ -31,10 +32,14 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   Widget build(BuildContext context) {
     final taskProvider = context.watch<TaskProvider>();
     final authProvider = context.watch<AuthProvider>();
+    final projectProvider = context.watch<ProjectProvider>();
+
+    final projectName = projectProvider.currentProjectName ?? '載入中...';
+    final isProjectLoading = projectProvider.isLoading;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('2025 花蓮馬太鞍溪堰塞湖災害'),
+        title: Text(projectName),
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -49,11 +54,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ],
         bottom: TabBar(
           controller: _tabController,
-          indicatorWeight: 5,
-          indicatorColor: Colors.blueGrey,
+          indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
-          indicatorSize: TabBarIndicatorSize.tab,
+          indicatorSize: TabBarIndicatorSize.label,
           tabs: const [
             Tab(text: '任務'),
             Tab(text: '執行中'),
@@ -71,14 +75,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (authProvider.isLoggedIn) {
-            context.go('/task/new');
-          } else {
-            context.go('/login');
-          }
-        },
-        child: const Icon(Icons.add),
+        onPressed: isProjectLoading // Disable button while loading
+            ? null
+            : () {
+                if (authProvider.isLoggedIn) {
+                  context.go('/task/new');
+                } else {
+                  context.go('/login');
+                }
+              },
+        child: isProjectLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Icon(Icons.add),
       ),
     );
   }

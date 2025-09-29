@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/task.dart';
+import '../models/user_profile.dart';
+import '../providers/auth_provider.dart';
 
 class TaskCard extends StatelessWidget {
   final Task task;
@@ -10,31 +13,43 @@ class TaskCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+    final textTheme = Theme.of(context).textTheme;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      clipBehavior: Clip.antiAlias, // Adds a nice ripple effect on tap
+      margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
       child: InkWell(
-        onTap: () {
-          context.go('/task/${task.id}');
-        },
+        onTap: () => context.go('/task/${task.id}'),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(task.name, style: textTheme.titleLarge),
+              Text(task.name, style: textTheme.titleMedium),
               const SizedBox(height: 8),
-              Text('發布人: ${task.publisherName}', style: textTheme.bodyMedium),
-              const SizedBox(height: 4),
-              Text(
-                '發布時間: ${DateFormat('yyyy/MM/dd HH:mm').format(task.publishedAt)}',
-                style: textTheme.bodySmall,
+              Row(
+                children: [
+                  const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: FutureBuilder<UserProfile?>(
+                      future: context.read<AuthProvider>().getUserById(task.publisherId),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Text('讀取中...', style: TextStyle(color: Colors.grey));
+                        }
+                        final publisherName = snapshot.data?.displayName ?? '[未知使用者]';
+                        return Text(publisherName, style: textTheme.bodySmall);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(DateFormat('yyyy/MM/dd').format(task.publishedAt), style: textTheme.bodySmall),
+                ],
               ),
-              const SizedBox(height: 12),
-              _buildStatus(context),
+              const SizedBox(height: 8),
+              _buildStatusChip(task.status),
             ],
           ),
         ),
@@ -42,52 +57,27 @@ class TaskCard extends StatelessWidget {
     );
   }
 
-  Widget _buildStatus(BuildContext context) {
-    final List<Widget> statusWidgets = [];
+  Widget _buildStatusChip(TaskStatus status) {
+    Color chipColor;
+    String label;
 
-    if (task.status == TaskStatus.claimed) {
-      statusWidgets.add(_StatusTag(text: '認領', color: Colors.blue));
-    } else if (task.status == TaskStatus.completed) {
-      statusWidgets.add(_StatusTag(text: '已完成', color: Colors.green));
+    switch (status) {
+      case TaskStatus.claimed:
+        chipColor = Colors.blue.shade100;
+        label = '已承接';
+        break;
+      case TaskStatus.completed:
+        chipColor = Colors.green.shade100;
+        label = '已完成';
+        break;
+      default:
+        return const SizedBox.shrink(); // Do not show chip for other statuses
     }
 
-    if (task.statusChangedAt != null &&
-        (task.status == TaskStatus.claimed || task.status == TaskStatus.completed)) {
-      if (statusWidgets.isNotEmpty) {
-        statusWidgets.add(const SizedBox(width: 8));
-      }
-      statusWidgets.add(Text(
-        '狀態變更: ${DateFormat('yyyy/MM/dd HH:mm').format(task.statusChangedAt!)}',
-        style: Theme.of(context).textTheme.bodySmall,
-      ));
-    }
-
-    if (statusWidgets.isEmpty) {
-      return const SizedBox.shrink(); // 如果沒有狀態標籤和時間，則不顯示任何東西
-    }
-
-    return Row(children: statusWidgets);
-  }
-}
-
-class _StatusTag extends StatelessWidget {
-  final String text;
-  final Color color;
-
-  const _StatusTag({required this.text, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white, fontSize: 12),
-      ),
+    return Chip(
+      label: Text(label),
+      backgroundColor: chipColor,
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
     );
   }
 }

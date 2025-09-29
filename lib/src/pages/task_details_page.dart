@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:supply_task/src/providers/task_type_provider.dart';
+import 'package:supply_task/src/models/user_profile.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/task.dart';
 import '../providers/auth_provider.dart';
@@ -18,6 +20,7 @@ class TaskDetailsPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final task = context.watch<TaskProvider>().getTaskById(taskId);
     final currentUser = context.watch<AuthProvider>().user;
+    final taskTypeProvider = context.watch<TaskTypeProvider>();
 
     if (task == null) {
       return Scaffold(
@@ -26,17 +29,18 @@ class TaskDetailsPage extends StatelessWidget {
       );
     }
 
-    // Mock logic to determine user role
-    final bool isPublisher = currentUser?.displayName == task.publisherName;
-    final bool isClaimant = currentUser?.displayName == task.claimantName;
+    final String taskTypeName = taskTypeProvider.isLoading
+        ? '讀取中...'
+        : taskTypeProvider.getTaskTypeNameById(task.typeId);
+
+    // Determine user role by comparing immutable IDs
+    final bool isPublisher = currentUser?.uid == task.publisherId;
+    final bool isClaimant = currentUser?.uid == task.claimantId;
     final bool canClaim = !isPublisher && task.status == TaskStatus.published;
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/')),
         title: Text(task.name),
         actions: [
           if (isPublisher)
@@ -49,7 +53,7 @@ class TaskDetailsPage extends StatelessWidget {
                 content: const Text('您確定要取消這個任務嗎？此操作無法復原。'),
                 confirmButtonText: '確定取消',
                 onConfirm: () {
-                  // TODO: Implement cancel task logic
+                  context.read<TaskProvider>().cancelTask(taskId);
                   context.go('/');
                 },
               ),
@@ -64,7 +68,7 @@ class TaskDetailsPage extends StatelessWidget {
                 content: const Text('您確定要放棄這個任務嗎？放棄後，任務將會重新開放給其他人承接。'),
                 confirmButtonText: '確定放棄',
                 onConfirm: () {
-                  // TODO: Implement abandon task logic
+                  context.read<TaskProvider>().abandonTask(taskId);
                   context.go('/');
                 },
               ),
@@ -85,10 +89,24 @@ class TaskDetailsPage extends StatelessWidget {
               }
             }),
             const SizedBox(height: 16),
+            _buildUserDisplayNameRow(context, Icons.person, '聯絡人', task.publisherId),
+            if (task.contactInfo.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildInfoRow(context, Icons.info_outline, '聯絡資訊', task.contactInfo, null),
+            ],
+            if (task.contactPhone.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildInfoRow(context, Icons.phone, '聯絡電話', task.contactPhone, () async {
+                final uri = Uri.parse('tel:${task.contactPhone}');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
+              }),
+            ],
             const Divider(height: 48),
-            _buildStatusCard(context, task),
+            _buildStatusCard(context, task, taskTypeName),
             const SizedBox(height: 24),
-            if (task.claimantName != null) _buildClaimantCard(context, task),
+            if (task.claimantId != null) _buildClaimantCard(context, task),
           ],
         ),
       ),
@@ -96,6 +114,25 @@ class TaskDetailsPage extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: _buildBottomButton(context, isPublisher, canClaim, task.id),
       ),
+    );
+  }
+
+  Widget _buildUserDisplayNameRow(BuildContext context, IconData icon, String label, String userId) {
+    final authProvider = context.read<AuthProvider>();
+
+    return FutureBuilder<UserProfile?>(
+      future: authProvider.getUserById(userId),
+      builder: (context, snapshot) {
+        String displayName = '讀取中...';
+        if (snapshot.connectionState == ConnectionState.done) {
+          if (snapshot.hasData && snapshot.data != null) {
+            displayName = snapshot.data!.displayName;
+          } else {
+            displayName = '[使用者不存在]';
+          }
+        }
+        return _buildInfoRow(context, icon, label, displayName, null);
+      },
     );
   }
 
@@ -113,7 +150,18 @@ class TaskDetailsPage extends StatelessWidget {
         icon: const Icon(Icons.pan_tool_alt_outlined),
         label: const Text('承接任務'),
         onPressed: () {
-          // TODO: Implement claim logic
+          showConfirmationDialog(
+            context: context,
+            title: '確認承接任務',
+            content: const Text('您確定要承接這個任務嗎？'),
+            confirmButtonText: '確定承接',
+            onConfirm: () {
+              final currentUser = context.read<AuthProvider>().user;
+              if (currentUser != null) {
+                context.read<TaskProvider>().claimTask(taskId, currentUser);
+              }
+            },
+          );
         },
         style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 48)),
       );
@@ -149,7 +197,7 @@ class TaskDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusCard(BuildContext context, Task task) {
+  Widget _buildStatusCard(BuildContext context, Task task, String taskTypeName) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -158,9 +206,11 @@ class TaskDetailsPage extends StatelessWidget {
           children: [
             Text('任務狀態', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
+            _buildInfoRow(context, Icons.category, '任務性質', taskTypeName, null),
+            const SizedBox(height: 16),
             _buildInfoRow(context, Icons.flag, '目前狀態', task.status.displayName, null),
             const SizedBox(height: 16),
-            _buildInfoRow(context, Icons.person_outline, '發布人', task.publisherName, null),
+            _buildUserDisplayNameRow(context, Icons.person_outline, '發布人', task.publisherId),
             const SizedBox(height: 16),
             _buildInfoRow(
               context,
@@ -198,7 +248,7 @@ class TaskDetailsPage extends StatelessWidget {
           children: [
             Text('承接人狀態', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 16),
-            _buildInfoRow(context, Icons.person_pin, '承接人', task.claimantName!, null),
+            _buildUserDisplayNameRow(context, Icons.person_pin, '承接人', task.claimantId!),
             const SizedBox(height: 16),
             _buildInfoRow(
               context,

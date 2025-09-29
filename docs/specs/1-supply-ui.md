@@ -42,11 +42,13 @@ class Task {
   final String address;
   final String type;
   final TaskStatus status;
-  final String publisherName;
+  final String publisherId;
+  final String contactInfo;
+  final String contactPhone;
   final DateTime publishedAt;
   final DateTime? editedAt;
   final DateTime? canceledAt;
-  final String? claimantName;
+  final String? claimantId;
   final DateTime? claimedAt;
   final DateTime? completedAt;
   final DateTime? statusChangedAt; // 用於認領、完成、放棄、取消的狀態變更時間
@@ -58,11 +60,13 @@ class Task {
     required this.address,
     required this.type,
     required this.status,
-    required this.publisherName,
+    required this.publisherId,
+    required this.contactInfo,
+    required this.contactPhone,
     required this.publishedAt,
     this.editedAt,
     this.canceledAt,
-    this.claimantName,
+    this.claimantId,
     this.claimedAt,
     this.completedAt,
     this.statusChangedAt,
@@ -109,8 +113,7 @@ class UserProfile {
 - `/profile`: 使用者資料頁 (UserProfilePage)
 - `/profile/edit`: 使用者編輯頁 (EditProfilePage)
 - `/login`: 登入頁 (LoginPage)
-- `/my-published-tasks`: 我發布的任務清單 (MyTasksPage)
-- `/my-claimed-tasks`: 我承接的任務清單 (MyTasksPage)
+- `/my-tasks/:type`: 我發布/承接的任務清單 (MyTasksPage)
 
 ### 4.2 首頁 (`HomePage`)
 
@@ -124,7 +127,8 @@ class UserProfile {
     - `FloatingActionButton`: 新增任務按鈕。
 - **元件**:
     - `TaskCard`:
-        - 顯示 `任務名稱`、`發布人`、`發布時間`。
+        - 顯示 `任務名稱`、`發布時間`。
+        - `發布人` 名稱會透過 `publisherId` 非同步地從 `users` 集合獲取並顯示。
         - 狀態標籤:
             - **認領** (藍色): `claimed` 狀態。
             - **已完成** (綠色): `completed` 狀態。
@@ -140,7 +144,7 @@ class UserProfile {
 - **結構**:
     - `AppBar`: 標題為 `任務名稱`。根據使用者身份顯示對應的 Action 按鈕。
     - `SingleChildScrollView`:
-        - 顯示所有任務欄位資訊。
+        - 顯示所有任務欄位資訊。其中 `發布人` 和 `承接人` 的名稱會透過 ID 非同步獲取。
         - `地址` 可點擊，並透過 `url_launcher` 開啟 Google Map。
         - `聯絡電話` 可點擊，並透過 `url_launcher` 開啟撥號功能。
         - 任務狀態區塊 (Card)。
@@ -171,9 +175,12 @@ class UserProfile {
     - **自動帶入**:
         - 新增任務時，自動帶入當前登入者的 `顯示名稱`、`聯絡資訊`、`聯絡電話`。
     - **置底按鈕**:
-        - **發布/更新**: 點擊後跳出確認 Dialog，確認後儲存資料，狀態設為 `published`。
-        - **儲存草稿**: 儲存資料，狀態設為 `draft`。若性質為自訂，需一併儲存。
-    - **取消**: 點擊 AppBar 的取消按鈕，跳出確認 Dialog，確認後返回上一頁。
+        - **新增任務時**: 顯示「發布」與「儲存草稿」按鈕。
+        - **編輯草稿時**: 顯示「發布」與「更新草稿」按鈕。
+        - **編輯已發布任務時**: 顯示單一的「更新任務」按鈕。
+    - **AppBar Actions**:
+        - **刪除**: **僅在編輯模式下顯示**。點擊後跳出確認 Dialog，確認後刪除該任務。
+    - **返回保護**: 當表單內容被修改後，若使用者試圖透過任何方式返回，皆會跳出確認對話框，詢問是否要捨棄變更。
 
 ### 4.5 使用者資料頁 (`UserProfilePage`)
 
@@ -197,6 +204,7 @@ class UserProfile {
 - **邏輯**:
     - `顯示名稱` 為必填。
     - 儲存成功後，返回使用者資料頁。
+    - **返回保護**: 同 `CreateEditTaskPage`，當表單內容被修改後，會攔截返回操作並提示使用者。
 
 ### 4.7 登入頁 (`LoginPage`)
 
@@ -205,6 +213,14 @@ class UserProfile {
 - **邏輯**:
     - 登入流程結束後，若為新使用者，強制導向 `/profile/edit` 頁面填寫基本資料。
     - 若為既有使用者，返回登入前的頁面或首頁。
+
+### 4.8 我的任務清單頁 (`MyTasksPage`)
+
+- **結構**:
+    - `AppBar`: 標題根據路由參數動態顯示為「我發布的任務」或「我承接的任務」。包含返回按鈕，可回到使用者資料頁。
+    - `Body`: 重複使用 `TaskList` 元件來顯示對應的任務清單。
+- **邏輯**:
+    - 根據路由傳入的 `type` (`published` 或 `claimed`)，從 `TaskProvider` 篩選出對應的任務列表並顯示。
 
 ## 5. 假資料 (Mock Data)
 

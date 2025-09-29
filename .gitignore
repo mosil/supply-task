@@ -46,3 +46,14 @@ app.*.map.json
 
 # Other
 .gemini
+
+# Environment variables
+.env
+
+# Firebase
+.flutter-plugins
+firebase-debug.log
+.firebase/
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart

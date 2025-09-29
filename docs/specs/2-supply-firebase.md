@@ -70,29 +70,28 @@
     - `name` (String): 任務名稱。
     - `content` (String): 任務內容。
     - `address` (String): 地址。
-    - `type` (String): 任務性質。
+    - `typeId` (String): 任務性質的 ID (對應 `taskTypes` 集合中的文件 ID)。
     - `status` (String): 任務狀態 (對應 `TaskStatus` enum 的字串，如 `published`)。
     - `publisherId` (String): 發布人的 `uid`。
-    - `publisherName` (String): 發布人的顯示名稱 (冗餘欄位，方便讀取)。
     - `publishedAt` (Timestamp): 發布時間。
     - `editedAt` (Timestamp, nullable): 編輯時間。
     - `canceledAt` (Timestamp, nullable): 取消時間。
     - `claimantId` (String, nullable): 承接人的 `uid`。
-    - `claimantName` (String, nullable): 承接人的顯示名稱 (冗餘欄位)。
     - `claimedAt` (Timestamp, nullable): 承接時間。
     - `completedAt` (Timestamp, nullable): 完成時間。
     - `statusChangedAt` (Timestamp, nullable): 狀態變更時間。
 
-#### **Collection: `task_types`**
+**備註**: `publisherName` 與 `claimantName` 已被移除，改為在客戶端需要顯示時，根據 `publisherId` 或 `claimantId` 即時從 `users` 集合中讀取，以確保使用者名稱永遠是最新狀態。
 
-- **Document ID**: `default` (或其他可識別的 ID)。
+#### **Collection: `taskTypes`**
+
+- **Document ID**: 自動生成的 ID (例如 `2aGf...`)。
 - **欄位 (Fields)**:
-    - `types` (Array<String>): 儲存所有任務性質的選項。
-    ```json
-    {
-      "types": ["勞力任務", "補給品需求", "發放資源"]
-    }
-    ```
+    - `name` (String): 任務性質的顯示名稱 (例如 "勞力任務")。
+- **初始化邏輯**: 客戶端 App 在啟動時，若發現此集合為空，則自動寫入三筆預設資料：
+    - `{ name: "勞力任務" }`
+    - `{ name: "補給品需求" }`
+    - `{ name: "發放資源" }`
 
 ## 4. 資料服務層 (Data Service Layer)
 
