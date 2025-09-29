@@ -1,0 +1,35 @@
+{
+    "name": "花蓮救災任務平台",
+    "short_name": "救災任務",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FFFFFF",
+    "theme_color": "#4CAF50",
+    "description": "一個提供花蓮馬太鞍溪堰塞湖災害相關互助任務的平台",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}

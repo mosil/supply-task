@@ -1,0 +1,53 @@
+# supply_task
+
+補給任務
+
+## Acknowledgements / 致謝
+
+This project was initiated and developed by [Ahdaa](https://github.com/mosil). If you find this project helpful or have used it as a basis for your own work, we would appreciate an attribution by linking back to the original repository. Your support is the greatest motivation for us to continue contributing to open source!
+
+本專案由 [Ahdaa](https://github.com/mosil) 發起並開發。如果您發現這個專案對您有幫助，或您基於此專案進行了二次開發，我們誠摯地希望您能在您的作品中標註來源，並附上原始專案的 GitHub 連結。您的支持是我們持續開源的最大動力！
+
+---
+
+## Contributor / 貢獻者
+
+- [Ahdaa](https://github.com/mosil)
+
+## License / 授權聲明
+
+This project is licensed under the MIT License.
+
+本專案採用 MIT 授權條款。
+
+### MIT License
+
+Copyright (c) 2025 Ahdaa
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+### MIT 授權條款（中文翻譯僅供參考）
+
+版權所有 (c) 2025 Ahdaa
+
+特此授予任何人免費獲得本軟體和相關文件檔案（「本軟體」）副本的權利，得無限制地處理本軟體，包括但不限於使用、複製、修改、合併、發布、散布、再授權和/或銷售本軟體副本的權利，並允許獲提供本軟體的人員進行上述操作，但須符合以下條件：
+
+上述版權聲明和本許可聲明應包含在本軟體的所有副本或主要部分中。
+
+本軟體乃以「現況」提供，不作任何明示或暗示的保證，包括但不限於可銷售性、特定用途適用性和無侵權的保證。在任何情況下，作者或版權持有人均不對任何索賠、損害或其他責任負責，無論是在合約、侵權或其他訴訟中，源自、出於或與本軟體或本軟體的使用或其他人為交易有關。
