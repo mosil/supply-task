@@ -34,13 +34,15 @@
 
 ### 2. Google 登入設定
 
-1.  在 Firebase Console 的 **Authentication** 服務中，啟用 **Google** 登入方式。
-2.  前往 [Google Cloud Console](https://console.cloud.google.com/)，在您的專案中啟用 **Google People API** (這是 Google 登入所需的 API)。
-3.  **重要**: 在 `web/index.html` 檔案的 `<head>` 區塊中，加入以下 `meta` 標籤，並將 `content` 值替換為您的 Google 登入 Web Client ID：
-    ```html
-    <meta name="google-signin-client_id" content="您的Google登入WebClientID">
-    ```
-    *   這個 ID 可以在 Firebase Console 的 Authentication -> 登入方式 -> Google -> 網頁 SDK 設定中找到。
+1. 在 Firebase Console 的 **Authentication** 服務中，啟用 **Google** 登入方式。
+2. 前往 [Google Cloud Console](https://console.cloud.google.com/)，在您的專案中啟用 **Google People API** (這是 Google
+   登入所需的 API)。
+3. **重要**: 在 `web/index.html` 檔案的 `<head>` 區塊中，加入以下 `meta` 標籤，並將 `content` 值替換為您的 Google 登入 Web
+   Client ID：
+   ```html
+   <meta name="google-signin-client_id" content="您的Google登入WebClientID">
+   ```
+    * 這個 ID 可以在 Firebase Console 的 Authentication -> 登入方式 -> Google -> 網頁 SDK 設定中找到。
 
 ### 3. 本地開發
 
@@ -53,10 +55,6 @@
 2. 在專案根目錄執行 `firebase use <您的專案ID>`，將當前目錄與您的 Firebase 專案連結。
 3. 執行 `flutter build web` 建置網頁應用程式。
 4. 執行 `firebase deploy --only hosting` 部署到 Firebase Hosting。
-
-## 你可能會遇到的問題
-
-1.  `Null check operator used on a null value`
 
 ## Acknowledgements / 致謝
 
