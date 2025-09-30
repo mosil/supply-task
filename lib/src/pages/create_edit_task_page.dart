@@ -210,6 +210,7 @@ class _CreateEditTaskPageState extends State<CreateEditTaskPage> {
         _onWillPop();
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: Text(widget.isEditing ? '編輯任務' : '發布任務'),
           leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onWillPop),

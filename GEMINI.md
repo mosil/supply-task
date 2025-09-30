@@ -70,5 +70,7 @@
 
 - **PopScope API 更新**: `PopScope` 的 `onPopInvoked` 回呼已被棄用，應使用新的 `onPopInvokedWithResult`，其簽名為 `(bool didPop, dynamic result)`。
 
+- **Flutter WebAssembly 編譯**: 使用 `flutter build web --wasm` 可以將 Flutter 應用程式編譯為 WebAssembly (Wasm)，這有助於提升網頁應用程式的執行效能，並提供 JavaScript 作為備用方案。
+
 - **路由返回攔截**: 應使用新版的 `PopScope` 元件。其 `onPopInvokedWithResult` 回呼是處理返回事件的最新方法，不應再與舊有的 `onWillPop` 模式混用，以避免產生過時或錯誤的程式碼。
 - **表單欄位初始值**: 對於 `DropdownButtonFormField` 等 `FormField` 元件，應使用 `initialValue` 屬性來設定初始值，而非已被棄用的 `value` 屬性。

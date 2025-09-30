@@ -38,6 +38,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final isProjectLoading = projectProvider.isLoading;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(projectName),
         actions: [

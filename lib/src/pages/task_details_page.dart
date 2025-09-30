@@ -39,6 +39,7 @@ class TaskDetailsPage extends StatelessWidget {
     final bool canClaim = !isPublisher && task.status == TaskStatus.published;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/')),
         title: Text(task.name),

@@ -103,6 +103,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _onWillPop();
       },
       child: Scaffold(
+        resizeToAvoidBottomInset: true,
         appBar: AppBar(
           title: const Text('編輯個人資料'),
           leading: isNewUser
