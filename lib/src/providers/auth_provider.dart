@@ -6,7 +6,9 @@ import 'package:supply_task/src/models/user_profile.dart';
 
 class AuthProvider with ChangeNotifier {
   final firebase_auth.FirebaseAuth _firebaseAuth = firebase_auth.FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: 'YOUR_GOOGLE_SIGN_IN_OAUTH_CLIENT_ID.apps.googleusercontent.com',
+  );
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   UserProfile? _user;
@@ -14,7 +16,9 @@ class AuthProvider with ChangeNotifier {
   final Map<String, UserProfile?> _userCache = {};
 
   UserProfile? get user => _user;
+
   bool get isLoggedIn => _user != null;
+
   bool get isNewUser => _isNewUser;
 
   AuthProvider() {
@@ -60,19 +64,44 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> signInWithGoogle() async {
     try {
+      debugPrint('Google Sign-In: Starting process.');
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return; // User cancelled the sign-in
+      if (googleUser == null) {
+        debugPrint('Google Sign-In: User cancelled the sign-in.');
+        return; // User cancelled the sign-in
+      }
+      debugPrint('Google Sign-In: Google user obtained.');
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final firebase_auth.AuthCredential credential = firebase_auth.GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+      debugPrint('Google Sign-In: Google authentication obtained.');
+
+      final String? accessToken = googleAuth.accessToken;
+      final String? idToken = googleAuth.idToken;
+
+      debugPrint('Google Sign-In: Access Token: $accessToken');
+      debugPrint('Google Sign-In: ID Token: $idToken');
+
+      firebase_auth.AuthCredential credential;
+
+      if (idToken != null) {
+        credential = firebase_auth.GoogleAuthProvider.credential(idToken: idToken, accessToken: accessToken);
+      } else if (accessToken != null) {
+        debugPrint('Google Sign-In Warning: ID Token is null, attempting to sign in with Access Token only.');
+        credential = firebase_auth.GoogleAuthProvider.credential(accessToken: accessToken);
+      } else {
+        debugPrint('Google Sign-In Error: Both Access Token and ID Token are null.');
+        throw Exception(
+          'Google Sign-In failed: Both Access Token and ID Token are null. Check Google Cloud Console OAuth client ID and authorized origins.',
+        );
+      }
+      debugPrint('Google Sign-In: Firebase credential created.');
 
       await _firebaseAuth.signInWithCredential(credential);
+      debugPrint('Google Sign-In: Firebase sign-in with credential successful.');
       // Auth state change will be handled by the listener
     } catch (e) {
       debugPrint('Error during Google sign-in: $e');
+      rethrow; // Re-throw to see the full stack trace in the browser console
     }
   }
 
